@@ -1,5 +1,6 @@
 package org.example
 
+import org.apache.spark.graphx.lineage.{LineageGraph, LineageGraphRDD}
 import org.apache.spark.graphx.{Edge, Graph, LineageContext, VertexRDD}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
@@ -37,7 +38,7 @@ object TestSample {
     val verRDD = lc.parallelize(verArray)
     val edgeRDD = lc.parallelize(edgeArray)
 
-    val graph = Graph(verRDD, edgeRDD)
+    val graph = LineageGraphRDD(verRDD, edgeRDD)
 
     graph.vertices.filter {
       case (id, (city, population)) => population > 50000
@@ -53,7 +54,6 @@ object TestSample {
 
     println("Filtration by edges")
 
-    graph.groupEdges((0,0)=>(0,0))
     graph.edges.filter
     {
       case Edge(city1, city2, distance) => distance < 150

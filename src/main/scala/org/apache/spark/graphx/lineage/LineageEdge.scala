@@ -7,6 +7,10 @@ import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
+/**
+ * Lineage trait for LineageEdgeRDD to be used while creating EdgeRDD during EgdeRDD transformation and actions
+ */
+
 trait LineageEdge[ED] extends EdgeRDD[ED] {
 
   implicit protected def vdTag: ClassTag[ED]

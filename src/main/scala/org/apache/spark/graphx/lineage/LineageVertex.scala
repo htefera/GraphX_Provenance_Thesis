@@ -7,6 +7,10 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
 
+/**
+ * Lineage trait for LineageVertexRDD to be used while creating VertexRDD during VertexRDD transformation and actions
+ */
+
 trait LineageVertex[VD] extends VertexRDD[VD] {
 
   implicit protected def vdTag: ClassTag[VD]

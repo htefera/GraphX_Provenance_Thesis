@@ -7,15 +7,32 @@ import org.apache.spark.graphx.{Edge, EdgeRDD, EdgeTriplet, Graph, PartitionStra
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
+/**
+ * Customized version of Graph extended to store Graph lineage info
+ * @param classTag$VD$0
+ * @param classTag$ED$0
+ * @tparam VD
+ * @tparam ED
+ */
+
 abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected () extends Graph[VD, ED] with LineageGraph[VD, ED] {
 
   override val vertices: VertexRDD[VD]
   override val edges: EdgeRDD[ED]
   override val triplets: RDD[EdgeTriplet[VD, ED]]
-
 }
 
 object LineageGraphRDD {
+
+
+  def apply[VD: ClassTag, ED: ClassTag](
+       vertices: RDD[(VertexId, VD)],
+       edges: RDD[Edge[ED]],
+       defaultVertexAttr: VD = null.asInstanceOf[VD],
+       edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
+       vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): LineageGraph[VD, ED] = {
+    LineageGraphImpl(vertices, edges, defaultVertexAttr, edgeStorageLevel, vertexStorageLevel)
+  }
 
   def fromEdgeTuples[VD: ClassTag](
       rawEdges: RDD[(VertexId, VertexId)],

@@ -5,6 +5,10 @@ import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
+/**
+ * Lineage trait for LineageRDD to be used while creating VertexRDD and EdgeRDD from parallelize method of Lineagecontext
+ */
+
 trait Lineage[T] extends RDD[T]  {
 
   implicit def ttag: ClassTag[T]

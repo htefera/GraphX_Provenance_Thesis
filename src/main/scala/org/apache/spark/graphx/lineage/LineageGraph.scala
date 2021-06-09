@@ -7,6 +7,10 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
 
+/**
+ * Lineage trait for LineageGraph to be used while creating Graph during Graph transformation and actions
+ */
+
 trait LineageGraph[VD, ED] extends Graph[VD, ED] {
 
   val vertices: VertexRDD[VD]

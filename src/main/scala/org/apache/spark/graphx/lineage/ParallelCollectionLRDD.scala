@@ -8,6 +8,11 @@ import org.apache.spark.storage.StorageLevel
 import scala.collection.Map
 import scala.reflect.{ClassTag, classTag}
 
+/**
+ * Customized version of ParallelCollectionRDD extended to store ParallelCollectionRDD lineage info
+ * while creating VertexRDD and EdgeRDD using parallelize method of LineageContext
+ */
+
 private[spark] class ParallelCollectionLRDD[T: ClassTag](
     lc: LineageContext,
     @transient val data: Seq[T],

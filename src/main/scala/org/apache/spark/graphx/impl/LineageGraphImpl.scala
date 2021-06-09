@@ -27,13 +27,13 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
     })
   }
 
-  override def persist(newLevel: StorageLevel): LineageGraph[VD, ED] = {
+  override def persist(newLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
     vertices.persist(newLevel)
     replicatedVertexView.edges.persist(newLevel)
     this
   }
 
-  override def cache(): LineageGraph[VD, ED] = {
+  override def cache(): LineageGraphImpl[VD, ED] = {
     vertices.cache()
     replicatedVertexView.edges.cache()
     this
@@ -55,24 +55,24 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
     }
   }
 
-  override def unpersist(blocking: Boolean = true): LineageGraph[VD, ED] = {
+  override def unpersist(blocking: Boolean = true): LineageGraphImpl[VD, ED] = {
     unpersistVertices(blocking)
     replicatedVertexView.edges.unpersist(blocking)
     this
   }
 
-  override def unpersistVertices(blocking: Boolean = true): LineageGraph[VD, ED] = {
+  override def unpersistVertices(blocking: Boolean = true): LineageGraphImpl[VD, ED] = {
     vertices.unpersist(blocking)
     // TODO: unpersist the replicated vertices in `replicatedVertexView` but leave the edges alone
     this
   }
 
-  override def partitionBy(partitionStrategy: PartitionStrategy): LineageGraph[VD, ED] = {
+  override def partitionBy(partitionStrategy: PartitionStrategy): LineageGraphImpl[VD, ED] = {
     partitionBy(partitionStrategy, edges.partitions.length)
   }
 
   override def partitionBy(
-      partitionStrategy: PartitionStrategy, numPartitions: Int): LineageGraph[VD, ED] = {
+      partitionStrategy: PartitionStrategy, numPartitions: Int): LineageGraphImpl[VD, ED] = {
     val edTag = classTag[ED]
     val vdTag = classTag[VD]
     val newEdges = edges.withPartitionsRDD(edges.map { e =>
@@ -97,7 +97,7 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
   }
 
   override def mapVertices[VD2: ClassTag]
-  (f: (VertexId, VD) => VD2)(implicit eq: VD =:= VD2 = null): LineageGraph[VD2, ED] = {
+  (f: (VertexId, VD) => VD2)(implicit eq: VD =:= VD2 = null): LineageGraphImpl[VD2, ED] = {
     // The implicit parameter eq will be populated by the compiler if VD and VD2 are equal, and left
     // null if not
     if (eq != null) {
@@ -134,7 +134,7 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
 
   override def subgraph(
        epred: EdgeTriplet[VD, ED] => Boolean = x => true,
-       vpred: (VertexId, VD) => Boolean = (a, b) => true): LineageGraph[VD, ED] = {
+       vpred: (VertexId, VD) => Boolean = (a, b) => true): LineageGraphImpl[VD, ED] = {
     vertices.cache()
     // Filter the vertices, reusing the partitioner and the index from this graph
     val newVerts = vertices.mapVertexPartitions(_.filter(vpred))
@@ -146,13 +146,13 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
   }
 
   override def mask[VD2: ClassTag, ED2: ClassTag](
-          other: Graph[VD2, ED2]): LineageGraph[VD, ED] = {
+          other: Graph[VD2, ED2]): LineageGraphImpl[VD, ED] = {
     val newVerts = vertices.innerJoin(other.vertices) { (vid, v, w) => v }
     val newEdges = replicatedVertexView.edges.innerJoin(other.edges) { (src, dst, v, w) => v }
     new LineageGraphImpl(newVerts, replicatedVertexView.withEdges(newEdges))
   }
 
-  override def groupEdges(merge: (ED, ED) => ED): LineageGraph[VD, ED] = {
+  override def groupEdges(merge: (ED, ED) => ED): LineageGraphImpl[VD, ED] = {
     val newEdges = replicatedVertexView.edges.mapEdgePartitions(
       (pid, part) => part.groupEdges(merge))
     new LineageGraphImpl(vertices, replicatedVertexView.withEdges(newEdges))
@@ -223,7 +223,7 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
   override def outerJoinVertices[U: ClassTag, VD2: ClassTag]
   (other: RDD[(VertexId, U)])
   (updateF: (VertexId, VD, Option[U]) => VD2)
-  (implicit eq: VD =:= VD2 = null): LineageGraph[VD2, ED] = {
+  (implicit eq: VD =:= VD2 = null): LineageGraphImpl[VD2, ED] = {
     // The implicit parameter eq will be populated by the compiler if VD and VD2 are equal, and left
     // null if not
     if (eq != null) {

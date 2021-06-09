@@ -9,6 +9,11 @@ import org.apache.spark.rdd.{ParallelCollectionRDD, RDD}
 import scala.collection.{Map, mutable}
 import scala.reflect.ClassTag
 
+
+/**
+ * Customized version of SparkContext used to capture and store lineage info, and enable/disable lineage capturing
+ */
+
 class LineageContext(@transient val sparkContext: SparkContext) extends Logging {
 
   private var captureLineage: Boolean = false
