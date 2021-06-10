@@ -4,7 +4,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Direction.Direction
 import org.apache.spark.graphx.lineage.{Lineage, LineageEdge, LineageVertex, ParallelCollectionLRDD}
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.{ParallelCollectionRDD, RDD}
 
 import scala.collection.{Map, mutable}
 import scala.reflect.ClassTag
@@ -14,7 +13,7 @@ import scala.reflect.ClassTag
  * Customized version of SparkContext used to capture and store lineage info, and enable/disable lineage capturing
  */
 
-class LineageContext(@transient val sparkContext: SparkContext) extends Logging {
+class LineageContext(@transient val sparkContext: SparkContext) extends Logging with Serializable {
 
   private var captureLineage: Boolean = false
 
