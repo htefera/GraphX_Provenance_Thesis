@@ -61,8 +61,5 @@ object TestSample {
       case Edge(city1, city2, distance) =>
         println(s"The distance between $city1 and $city2 is $distance")
     }
-
-
   }
-
 }
