@@ -13,11 +13,5 @@ import scala.reflect.ClassTag
 
 trait LineageEdge[ED] extends EdgeRDD[ED] {
 
-  implicit protected def vdTag: ClassTag[ED]
-  private[graphx] def partitionsRDD: RDD[(PartitionID, EdgePartition[ED, VD])] forSome { type VD }
-  override protected def getPartitions: Array[Partition] = partitionsRDD.partitions
-
-
-  @transient def lineageContext: LineageContext
 
 }

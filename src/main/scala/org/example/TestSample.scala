@@ -1,9 +1,8 @@
 package org.example
 
-import org.apache.spark.graphx.lineage.{LineageGraph, LineageGraphRDD}
-import org.apache.spark.graphx.{Edge, Graph, LineageContext, VertexRDD}
-import org.apache.spark.rdd.RDD
+import org.apache.spark.graphx.{Edge, LineageContext}
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.graphx.lineage.LineageGraphRDD
 
 object TestSample {
   def main(args: Array[String]): Unit = {

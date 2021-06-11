@@ -2,22 +2,22 @@ package org.apache.spark.graphx.impl
 
 import org.apache.spark.HashPartitioner
 import org.apache.spark.graphx._
-import org.apache.spark.graphx.lineage.LineageGraph
+import org.apache.spark.graphx.lineage.{LineageEdgeRDD, LineageGraph, LineageRDD, LineageVertex, LineageVertexRDD}
 import org.apache.spark.graphx.util.BytecodeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.{ClassTag, classTag}
 
-class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
-       @transient val vertices: VertexRDD[VD],
-       @transient val replicatedVertexView: ReplicatedVertexView[VD, ED])
+class LineageGraphRDDImpl[VD: ClassTag, ED: ClassTag](
+       @transient val vertices: LineageVertexRDDImpl[VD],
+       @transient val replicatedVertexView: LineageReplicatedVertexView[VD, ED])
   extends LineageGraph[VD, ED]{
 
   /** Default constructor is provided to support serialization */
   protected def this() = this(null, null)
 
-  @transient override val edges: EdgeRDDImpl[ED, VD] = replicatedVertexView.edges
+  @transient override val edges: LineageEdgeRDDImpl[ED, VD] = replicatedVertexView.edges
 
   /** Return an RDD that brings edges together with their source and destination vertices. */
   @transient override lazy val triplets: RDD[EdgeTriplet[VD, ED]] = {
@@ -27,13 +27,13 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
     })
   }
 
-  override def persist(newLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
+  override def persist(newLevel: StorageLevel): LineageGraph[VD, ED] = {
     vertices.persist(newLevel)
     replicatedVertexView.edges.persist(newLevel)
     this
   }
 
-  override def cache(): LineageGraphImpl[VD, ED] = {
+  override def cache(): LineageGraphRDDImpl[VD, ED] = {
     vertices.cache()
     replicatedVertexView.edges.cache()
     this
@@ -55,24 +55,24 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
     }
   }
 
-  override def unpersist(blocking: Boolean = true): LineageGraphImpl[VD, ED] = {
+  override def unpersist(blocking: Boolean = true): LineageGraph[VD, ED] = {
     unpersistVertices(blocking)
     replicatedVertexView.edges.unpersist(blocking)
     this
   }
 
-  override def unpersistVertices(blocking: Boolean = true): LineageGraphImpl[VD, ED] = {
+  override def unpersistVertices(blocking: Boolean = true): LineageGraph[VD, ED] = {
     vertices.unpersist(blocking)
     // TODO: unpersist the replicated vertices in `replicatedVertexView` but leave the edges alone
     this
   }
 
-  override def partitionBy(partitionStrategy: PartitionStrategy): LineageGraphImpl[VD, ED] = {
+  override def partitionBy(partitionStrategy: PartitionStrategy): LineageGraph[VD, ED] = {
     partitionBy(partitionStrategy, edges.partitions.length)
   }
 
   override def partitionBy(
-      partitionStrategy: PartitionStrategy, numPartitions: Int): LineageGraphImpl[VD, ED] = {
+      partitionStrategy: PartitionStrategy, numPartitions: Int): LineageGraphRDDImpl[VD, ED] = {
     val edTag = classTag[ED]
     val vdTag = classTag[VD]
     val newEdges = edges.withPartitionsRDD(edges.map { e =>
@@ -89,15 +89,15 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
         val edgePartition = builder.toEdgePartition
         Iterator((pid, edgePartition))
       }, preservesPartitioning = true)).cache()
-    LineageGraphImpl.fromExistingRDDs(vertices.withEdges(newEdges), newEdges)
+    LineageGraphRDDImpl.fromExistingRDDs(vertices.withEdges(newEdges), newEdges)
   }
 
-  override def reverse: Graph[VD, ED] = {
-    new LineageGraphImpl(vertices.reverseRoutingTables(), replicatedVertexView.reverse())
+  override def reverse: LineageGraph[VD, ED] = {
+    new LineageGraphRDDImpl(vertices.reverseRoutingTables(), replicatedVertexView.reverse())
   }
 
   override def mapVertices[VD2: ClassTag]
-  (f: (VertexId, VD) => VD2)(implicit eq: VD =:= VD2 = null): LineageGraphImpl[VD2, ED] = {
+  (f: (VertexId, VD) => VD2)(implicit eq: VD =:= VD2 = null): LineageGraph[VD2, ED] = {
     // The implicit parameter eq will be populated by the compiler if VD and VD2 are equal, and left
     // null if not
     if (eq != null) {
@@ -107,34 +107,36 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
       val changedVerts = vertices.asInstanceOf[VertexRDD[VD2]].diff(newVerts)
       val newReplicatedVertexView = replicatedVertexView.asInstanceOf[ReplicatedVertexView[VD2, ED]]
         .updateVertices(changedVerts)
-      new LineageGraphImpl(newVerts, newReplicatedVertexView)
+      new LineageGraphRDDImpl(newVerts, newReplicatedVertexView)
     } else {
       // The map does not preserve type, so we must re-replicate all vertices
-      LineageGraphImpl(vertices.mapVertexPartitions(_.map(f)), replicatedVertexView.edges)
+      LineageGraphRDDImpl(vertices.mapVertexPartitions(_.map(f)), replicatedVertexView.edges)
     }
   }
 
   override def mapEdges[ED2: ClassTag](
-                                        f: (PartitionID, Iterator[Edge[ED]]) => Iterator[ED2]): Graph[VD, ED2] = {
+        f: (PartitionID, Iterator[Edge[ED]]) => Iterator[ED2]): LineageGraph[VD, ED2] = {
     val newEdges = replicatedVertexView.edges
       .mapEdgePartitions((pid, part) => part.map(f(pid, part.iterator)))
-    new LineageGraphImpl(vertices, replicatedVertexView.withEdges(newEdges))
+    new LineageGraphRDDImpl(vertices, replicatedVertexView.withEdges(newEdges))
   }
 
   override def mapTriplets[ED2: ClassTag](
-                                           f: (PartitionID, Iterator[EdgeTriplet[VD, ED]]) => Iterator[ED2],
-                                           tripletFields: TripletFields): Graph[VD, ED2] = {
+       f: (PartitionID, Iterator[EdgeTriplet[VD, ED]]) => Iterator[ED2],
+       tripletFields: TripletFields): Graph[VD, ED2] = {
+
     vertices.cache()
     replicatedVertexView.upgrade(vertices, tripletFields.useSrc, tripletFields.useDst)
     val newEdges = replicatedVertexView.edges.mapEdgePartitions { (pid, part) =>
       part.map(f(pid, part.tripletIterator(tripletFields.useSrc, tripletFields.useDst)))
     }
-    new LineageGraphImpl(vertices, replicatedVertexView.withEdges(newEdges))
+    new LineageGraphRDDImpl(vertices, replicatedVertexView.withEdges(newEdges))
   }
 
   override def subgraph(
        epred: EdgeTriplet[VD, ED] => Boolean = x => true,
-       vpred: (VertexId, VD) => Boolean = (a, b) => true): LineageGraphImpl[VD, ED] = {
+       vpred: (VertexId, VD) => Boolean = (a, b) => true): LineageGraphRDDImpl[VD, ED] = {
+
     vertices.cache()
     // Filter the vertices, reusing the partitioner and the index from this graph
     val newVerts = vertices.mapVertexPartitions(_.filter(vpred))
@@ -142,20 +144,21 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
     // on both src and dst vertices
     replicatedVertexView.upgrade(vertices, true, true)
     val newEdges = replicatedVertexView.edges.filter(epred, vpred)
-    new LineageGraphImpl(newVerts, replicatedVertexView.withEdges(newEdges))
+    new LineageGraphRDDImpl(newVerts, replicatedVertexView.withEdges(newEdges))
   }
 
   override def mask[VD2: ClassTag, ED2: ClassTag](
-          other: Graph[VD2, ED2]): LineageGraphImpl[VD, ED] = {
+          other: Graph[VD2, ED2]): LineageGraphRDDImpl[VD, ED] = {
+
     val newVerts = vertices.innerJoin(other.vertices) { (vid, v, w) => v }
     val newEdges = replicatedVertexView.edges.innerJoin(other.edges) { (src, dst, v, w) => v }
-    new LineageGraphImpl(newVerts, replicatedVertexView.withEdges(newEdges))
+    new LineageGraphRDDImpl(newVerts, replicatedVertexView.withEdges(newEdges))
   }
 
-  override def groupEdges(merge: (ED, ED) => ED): LineageGraphImpl[VD, ED] = {
+  override def groupEdges(merge: (ED, ED) => ED): LineageGraphRDDImpl[VD, ED] = {
     val newEdges = replicatedVertexView.edges.mapEdgePartitions(
       (pid, part) => part.groupEdges(merge))
-    new LineageGraphImpl(vertices, replicatedVertexView.withEdges(newEdges))
+    new LineageGraphRDDImpl(vertices, replicatedVertexView.withEdges(newEdges))
   }
 
   // ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,7 +169,7 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
           sendMsg: EdgeContext[VD, ED, A] => Unit,
           mergeMsg: (A, A) => A,
           tripletFields: TripletFields,
-          activeSetOpt: Option[(VertexRDD[_], EdgeDirection)]): VertexRDD[A] = {
+          activeSetOpt: Option[(VertexRDD[_], EdgeDirection)]): LineageVertexRDDImpl[A] = {
 
     vertices.cache()
     // For each vertex, replicate its attribute only to partitions where it is
@@ -223,7 +226,7 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
   override def outerJoinVertices[U: ClassTag, VD2: ClassTag]
   (other: RDD[(VertexId, U)])
   (updateF: (VertexId, VD, Option[U]) => VD2)
-  (implicit eq: VD =:= VD2 = null): LineageGraphImpl[VD2, ED] = {
+  (implicit eq: VD =:= VD2 = null): LineageGraphRDDImpl[VD2, ED] = {
     // The implicit parameter eq will be populated by the compiler if VD and VD2 are equal, and left
     // null if not
     if (eq != null) {
@@ -233,11 +236,11 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
       val changedVerts = vertices.asInstanceOf[VertexRDD[VD2]].diff(newVerts)
       val newReplicatedVertexView = replicatedVertexView.asInstanceOf[ReplicatedVertexView[VD2, ED]]
         .updateVertices(changedVerts)
-      new LineageGraphImpl(newVerts, newReplicatedVertexView)
+      new LineageGraphRDDImpl(newVerts, newReplicatedVertexView)
     } else {
       // updateF does not preserve type, so we must re-replicate all vertices
       val newVerts = vertices.leftJoin(other)(updateF)
-      LineageGraphImpl(newVerts, replicatedVertexView.edges)
+      LineageGraphRDDImpl(newVerts, replicatedVertexView.edges)
     }
   }
 
@@ -252,13 +255,14 @@ class LineageGraphImpl[VD: ClassTag, ED: ClassTag] (
 
 }
 
-object LineageGraphImpl {
+object LineageGraphRDDImpl {
+
   def apply[VD: ClassTag, ED: ClassTag](
        edges: RDD[Edge[ED]],
        defaultVertexAttr: VD,
        edgeStorageLevel: StorageLevel,
-       vertexStorageLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
-    fromEdgeRDD(EdgeRDD.fromEdges(edges), defaultVertexAttr, edgeStorageLevel, vertexStorageLevel)
+       vertexStorageLevel: StorageLevel): LineageGraphRDDImpl[VD, ED] = {
+    fromEdgeRDD(LineageEdgeRDD.fromEdges(edges), defaultVertexAttr, edgeStorageLevel, vertexStorageLevel)
   }
 
   /**
@@ -268,8 +272,8 @@ object LineageGraphImpl {
       edgePartitions: RDD[(PartitionID, EdgePartition[ED, VD])],
       defaultVertexAttr: VD,
       edgeStorageLevel: StorageLevel,
-      vertexStorageLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
-    fromEdgeRDD(EdgeRDD.fromEdgePartitions(edgePartitions), defaultVertexAttr, edgeStorageLevel,
+      vertexStorageLevel: StorageLevel): LineageGraphRDDImpl[VD, ED] = {
+    fromEdgeRDD(LineageEdgeRDD.fromEdgePartitions(edgePartitions), defaultVertexAttr, edgeStorageLevel,
       vertexStorageLevel)
   }
 
@@ -281,12 +285,12 @@ object LineageGraphImpl {
      edges: RDD[Edge[ED]],
      defaultVertexAttr: VD,
      edgeStorageLevel: StorageLevel,
-     vertexStorageLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
-    val edgeRDD = EdgeRDD.fromEdges(edges)(classTag[ED], classTag[VD])
+     vertexStorageLevel: StorageLevel): LineageGraphRDDImpl[VD, ED] = {
+    val edgeRDD = LineageEdgeRDD.fromEdges(edges)(classTag[ED], classTag[VD])
       .withTargetStorageLevel(edgeStorageLevel)
-    val vertexRDD = VertexRDD(vertices, edgeRDD, defaultVertexAttr)
+    val vertexRDD = LineageVertexRDD(vertices, edgeRDD, defaultVertexAttr)
       .withTargetStorageLevel(vertexStorageLevel)
-    LineageGraphImpl(vertexRDD, edgeRDD)
+    LineageGraphRDDImpl(vertexRDD, edgeRDD)
   }
 
   /**
@@ -295,17 +299,17 @@ object LineageGraphImpl {
    * `VertexRDD.withEdges` or an appropriate VertexRDD constructor.
    */
   def apply[VD: ClassTag, ED: ClassTag](
-       vertices: VertexRDD[VD],
-       edges: EdgeRDD[ED]): LineageGraphImpl[VD, ED] = {
+       vertices: LineageVertexRDDImpl[VD],
+       edges: LineageEdgeRDDImpl[ED,_]): LineageGraphRDDImpl[VD, ED] = {
 
     vertices.cache()
 
     // Convert the vertex partitions in edges to the correct type
-    val newEdges = edges.asInstanceOf[EdgeRDDImpl[ED, _]]
+    val newEdges = edges.asInstanceOf[LineageEdgeRDDImpl[ED, _]]
       .mapEdgePartitions((pid, part) => part.withoutVertexAttributes[VD])
       .cache()
 
-    LineageGraphImpl.fromExistingRDDs(vertices, newEdges)
+    LineageGraphRDDImpl.fromExistingRDDs(vertices, newEdges)
   }
 
   /**
@@ -314,9 +318,9 @@ object LineageGraphImpl {
    * `VertexRDD.withEdges` or an appropriate VertexRDD constructor.
    */
   def fromExistingRDDs[VD: ClassTag, ED: ClassTag](
-      vertices: VertexRDD[VD],
-      edges: EdgeRDD[ED]): LineageGraphImpl[VD, ED] = {
-    new LineageGraphImpl(vertices, new ReplicatedVertexView(edges.asInstanceOf[EdgeRDDImpl[ED, VD]]))
+      vertices: LineageVertexRDDImpl[VD],
+      edges: LineageEdgeRDDImpl[ED,_]): LineageGraphRDDImpl[VD, ED] = {
+    new LineageGraphRDDImpl(vertices, new ReplicatedVertexView(edges.asInstanceOf[EdgeRDDImpl[ED, VD]]))
   }
 
   /**
@@ -324,15 +328,14 @@ object LineageGraphImpl {
    * `defaultVertexAttr`. The vertices will have the same number of partitions as the EdgeRDD.
    */
   private def fromEdgeRDD[VD: ClassTag, ED: ClassTag](
-       edges: EdgeRDDImpl[ED, VD],
+       edges: LineageEdgeRDDImpl[ED, VD],
        defaultVertexAttr: VD,
        edgeStorageLevel: StorageLevel,
-       vertexStorageLevel: StorageLevel): LineageGraphImpl[VD, ED] = {
+       vertexStorageLevel: StorageLevel): LineageGraphRDDImpl[VD, ED] = {
 
 
     val edgesCached = edges.withTargetStorageLevel(edgeStorageLevel).cache()
-    val vertices =
-      VertexRDD.fromEdges(edgesCached, edgesCached.partitions.length, defaultVertexAttr)
+    val vertices = LineageVertexRDD.fromEdges(edgesCached, edgesCached.partitions.length, defaultVertexAttr)
         .withTargetStorageLevel(vertexStorageLevel)
     fromExistingRDDs(vertices, edgesCached)
   }

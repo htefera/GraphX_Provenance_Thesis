@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="GraphX_Tutorial" />
+        <module name="GraphX_Provenance_Thesis" />
       </profile>
     </annotationProcessing>
   </component>
