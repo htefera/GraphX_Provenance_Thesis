@@ -1,12 +1,18 @@
 package org.apache.spark.graphx.impl
 
-import org.apache.spark.{OneToOneDependency, Partition}
-import org.apache.spark.graphx.{EdgeRDD, LineageContext, PartitionID, VertexId, VertexRDD}
+import org.apache.spark.Partition
 import org.apache.spark.graphx.lineage.{LineageRDD, LineageVertex, LineageVertexRDD}
+import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
+
+//VertexId: When you trace back from input to output , avoid any kind of conflict
+// RDD-Id:
+// srcId, destId: should be unique , consider this one: take care about the collision
+// Consider twitter and Instagram Id: Overhead should be one problem
+// Instagram one is preferable one
 
 class LineageVertexRDDImpl[VD] private[graphx] (
      @transient val partitionsRDD: RDD[ShippableVertexPartition[VD]],

@@ -2,7 +2,7 @@ package org.apache.spark.graphx
 
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Direction.Direction
-import org.apache.spark.graphx.lineage.{Lineage, LineageEdge, LineageVertex, ParallelCollectionLRDD}
+import org.apache.spark.graphx.lineage._
 import org.apache.spark.internal.Logging
 
 import scala.collection.{Map, mutable}
@@ -97,7 +97,13 @@ class LineageContext(@transient val sparkContext: SparkContext) extends Logging 
     null
   }
 
+
   def getLineage(rdd: LineageVertex[_]) = {
+
+  }
+
+  def getLineage(rdd:LineageGraph[_,_]): Unit =
+  {
 
   }
 

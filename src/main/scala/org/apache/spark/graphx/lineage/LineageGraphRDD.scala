@@ -1,6 +1,6 @@
 package org.apache.spark.graphx.lineage
 
-import org.apache.spark.graphx.impl.LineageGraphRDDImpl
+import org.apache.spark.graphx.impl.{LineageEdgeRDDImpl, LineageGraphRDDImpl, LineageVertexRDDImpl}
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -9,18 +9,17 @@ import scala.reflect.ClassTag
 
 /**
  * Customized version of Graph extended to store Graph lineage info
- *
+ * Provenance Inforemation of Graph abstractions
  * @param classTag$VD$0
  * @param classTag$ED$0
  * @tparam VD
  * @tparam ED
  */
-//I guess this should not be abstract. Maybe we need to have the same class withought abstract keyword
 abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected()
   extends Graph[VD, ED] with LineageGraph[VD, ED] {
 
-  override val vertices: LineageVertexRDD[VD] //should return LineageVertexRDD
-  override val edges: LineageEdgeRDD[ED] //should return LineageEdgeRDD
+  override val vertices: LineageVertexRDDImpl[VD] //should return LineageVertexRDD
+  override val edges: LineageEdgeRDDImpl[ED, VD] //should return LineageEdgeRDD
   override val triplets: RDD[EdgeTriplet[VD, ED]] //???
 
 }

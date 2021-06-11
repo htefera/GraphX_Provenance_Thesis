@@ -1,14 +1,13 @@
 package org.apache.spark.graphx.lineage
-import org.apache.spark.{Dependency, Partition, SparkContext}
-import org.apache.spark.graphx.{EdgeRDD, LineageContext, VertexId, VertexRDD}
+import org.apache.spark.Partition
 import org.apache.spark.graphx.impl.{LineageVertexRDDImpl, ShippableVertexPartition}
+import org.apache.spark.graphx.{LineageContext, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
 
 /**
- * Lineage trait for LineageVertexRDD to be used while creating VertexRDD during VertexRDD transformation and actions
+ * Lineage trait for LineageVertexRDD to be used while creating VertexRDD during VertexRDD transformation
  */
 
 trait LineageVertex[VD] extends VertexRDD[VD] {

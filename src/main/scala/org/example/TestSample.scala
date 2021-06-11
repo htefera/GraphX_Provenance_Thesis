@@ -38,6 +38,8 @@ object TestSample {
     val edgeRDD = lc.parallelize(edgeArray)
 
     val graph = LineageGraphRDD(verRDD, edgeRDD)
+    //cluster running
+
 
     graph.vertices.filter {
       case (id, (city, population)) => population > 50000

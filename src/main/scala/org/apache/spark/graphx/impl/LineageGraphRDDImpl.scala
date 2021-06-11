@@ -8,7 +8,9 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.{ClassTag, classTag}
-
+/**
+ * customized implementation of  VertexRDD, EdgeRDD and Graph and their corresponding operations
+ **/
 class LineageGraphRDDImpl[VD: ClassTag, ED: ClassTag](
        @transient val vertices: LineageVertexRDDImpl[VD],
        @transient val replicatedVertexView: LineageReplicatedVertexView[VD, ED])
@@ -164,6 +166,7 @@ class LineageGraphRDDImpl[VD: ClassTag, ED: ClassTag](
   // ///////////////////////////////////////////////////////////////////////////////////////////////
   // Lower level transformation methods
   // ///////////////////////////////////////////////////////////////////////////////////////////////
+
 
   override def aggregateMessagesWithActiveSet[A: ClassTag](
           sendMsg: EdgeContext[VD, ED, A] => Unit,

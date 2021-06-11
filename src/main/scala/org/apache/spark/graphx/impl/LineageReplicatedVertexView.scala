@@ -1,6 +1,5 @@
 package org.apache.spark.graphx.impl
 
-import org.apache.spark.graphx.lineage.LineageVertexRDD
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag

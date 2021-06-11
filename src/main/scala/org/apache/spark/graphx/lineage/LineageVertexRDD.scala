@@ -1,15 +1,15 @@
 package org.apache.spark.graphx.lineage
 
-import org.apache.spark.graphx.VertexRDD.createRoutingTables
-import org.apache.spark.graphx.impl.{LineageVertexRDDImpl, RoutingTablePartition, ShippableVertexPartition, VertexRDDImpl}
-import org.apache.spark.{Dependency, HashPartitioner, Partition, Partitioner, SparkContext, TaskContext}
+import org.apache.spark.graphx.impl.{LineageVertexRDDImpl, RoutingTablePartition, ShippableVertexPartition}
 import org.apache.spark.graphx.{EdgeRDD, LineageContext, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
+import org.apache.spark._
 
 import scala.reflect.ClassTag
 /**
  * Customized version of VertexRDD extended to store VertexRDD lineage info
+ * Planning to use VertexRDD Id beccause it is unique throughout the graph
+ * VertexRDD extended with Provenance Information
  */
 abstract class LineageVertexRDD[VD](lc: LineageContext, deps: Seq[Dependency[_]])
   extends VertexRDD[VD] (lc.sparkContext, deps) with LineageVertex[VD] {

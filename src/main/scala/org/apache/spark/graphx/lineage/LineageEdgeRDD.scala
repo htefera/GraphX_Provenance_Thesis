@@ -1,24 +1,23 @@
 package org.apache.spark.graphx.lineage
 
-import org.apache.spark.{Dependency, Partition, TaskContext}
-import org.apache.spark.graphx.impl.{EdgePartition, EdgePartitionBuilder, EdgeRDDImpl, LineageEdgeRDDImpl}
-import org.apache.spark.graphx.{Edge, EdgeRDD, LineageContext, PartitionID, VertexId}
+import org.apache.spark.graphx.impl.{EdgePartition, EdgePartitionBuilder, LineageEdgeRDDImpl}
+import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{Dependency, Partition, TaskContext}
 
-import scala.reflect.{ClassTag, classTag}
+import scala.reflect.ClassTag
 
 /**
  * Customized version of EdgeRDD extended to store EdgeRDD lineage info
+ * Provenance information of EdgreRDD transformations
+ * Copy will have some dependency problem. You have to copy all dependecny
  */
 
 abstract class LineageEdgeRDD[ED](lc: LineageContext, deps: Seq[Dependency[_]]) extends EdgeRDD[ED](lc.sparkContext, deps)
     with LineageEdge[ED] {
 
-
-  override implicit protected def vdTag: ClassTag[ED] = ???  // TODO
   private[graphx] def partitionsRDD: RDD[(PartitionID, EdgePartition[ED, VD])] forSome { type VD }
-  override def lineageContext: LineageContext = lc
 
   override def compute(part: Partition, context: TaskContext): Iterator[Edge[ED]] = {
     val p = firstParent[(PartitionID, EdgePartition[ED, _])].iterator(part, context)
