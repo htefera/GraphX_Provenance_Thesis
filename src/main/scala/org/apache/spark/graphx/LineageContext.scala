@@ -11,6 +11,7 @@ import scala.reflect.ClassTag
 
 /**
  * Customized version of SparkContext used to capture and store lineage info, and enable/disable lineage capturing
+ * If we use Titian Lineage Context as it is we need to copy all the dependencies because Titian Lineage uses lots of dependencies
  */
 
 class LineageContext(@transient val sparkContext: SparkContext) extends Logging with Serializable {
@@ -56,6 +57,8 @@ class LineageContext(@transient val sparkContext: SparkContext) extends Logging 
     lastLineageSeen = currentLineagePosition
   }
 
+
+
   def search(path: List[LineageVertex[_]], initialRDD: LineageVertex[_]): List[LineageVertex[_]] = {
     path.map(rdd =>
       if(rdd.id == initialRDD.id) return path
@@ -87,7 +90,7 @@ class LineageContext(@transient val sparkContext: SparkContext) extends Logging 
   }
 
 
-
+/** we should able to trace back until the input data */
   def getBackward(path: Int = 0) = {
     // TODO
   }
@@ -97,6 +100,11 @@ class LineageContext(@transient val sparkContext: SparkContext) extends Logging 
     null
   }
 
+  /** GetLineage returns position of the current Lineage.
+   *  VertexRDD and EdgeRDD Lineages should be included or called from Graph Lineage
+   * Therefore make getLineage method to return position of GraphLineageRDD instead of implementing
+   * an overloaded getLineage method for each abstractions
+  */
 
   def getLineage(rdd: LineageVertex[_]) = {
 

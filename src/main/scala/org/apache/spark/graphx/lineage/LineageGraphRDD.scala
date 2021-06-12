@@ -4,17 +4,18 @@ import org.apache.spark.graphx.impl.{LineageEdgeRDDImpl, LineageGraphRDDImpl, Li
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.graphx.Direction.Direction
 
 import scala.reflect.ClassTag
-
 /**
  * Customized version of Graph extended to store Graph lineage info
- * Provenance Inforemation of Graph abstractions
+ * Provenance Information of Graph abstractions
  * @param classTag$VD$0
  * @param classTag$ED$0
  * @tparam VD
  * @tparam ED
  */
+// Passing Record Id( It can server as Input, and output Id) as an argument to the LineageGraphRDD would be great
 abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected()
   extends Graph[VD, ED] with LineageGraph[VD, ED] {
 
@@ -22,7 +23,30 @@ abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected()
   override val edges: LineageEdgeRDDImpl[ED, VD] //should return LineageEdgeRDD
   override val triplets: RDD[EdgeTriplet[VD, ED]] //???
 
+/** Tracing backward and forward Lineage information for the Graph Abstractions*/
+
+  private[graphx] def go(times: Int, direction: Direction = Direction.FORWARD): LineageGraphRDD[VD,ED] =
+  {
+    ???
+  }
+  def getBack():LineageGraphRDD[VD, ED]={
+    ???
+  }
+
+  def getNext(): LineageGraphRDD[VD,ED]={
+    ???
+  }
+
+  def getNextAll():LineageGraphRDD[VD,ED]={
+    ???
+  }
+  def getBackAll():LineageGraphRDD[VD,ED]={
+    ???
+  }
+
+
 }
+
 
 object LineageGraphRDD {
 
