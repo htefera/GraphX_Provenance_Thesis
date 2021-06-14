@@ -7,7 +7,7 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
 
-abstract class        VertexRDD[VD] (
+abstract class VertexRDD[VD] (
    sc: SparkContext,
    deps: Seq[Dependency[_]]) extends RDD[(VertexId, VD)](sc, deps) {
 

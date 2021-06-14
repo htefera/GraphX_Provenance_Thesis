@@ -9,9 +9,10 @@ import org.apache.spark.storage.StorageLevel
 import scala.reflect.{ClassTag, classTag}
 
 class LineageEdgeRDDImpl[ED: ClassTag, VD: ClassTag] private[graphx] (
+    @transient val lineageContext: LineageContext,
     @transient override val partitionsRDD: RDD[(PartitionID, EdgePartition[ED, VD])],
     val targetStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY)
-  extends EdgeRDD[ED](partitionsRDD.context, List(new OneToOneDependency(partitionsRDD))) with LineageEdge[ED] {
+  extends LineageEdgeRDD[ED](lineageContext, List(new OneToOneDependency(partitionsRDD))) with LineageEdge[ED] {
 
   override def setName(_name: String): this.type = {
     if (partitionsRDD.name != null) {
@@ -112,12 +113,24 @@ class LineageEdgeRDDImpl[ED: ClassTag, VD: ClassTag] private[graphx] (
 
   private[graphx] def withPartitionsRDD[ED2: ClassTag, VD2: ClassTag](
    partitionsRDD: RDD[(PartitionID, EdgePartition[ED2, VD2])]): LineageEdgeRDDImpl[ED2, VD2] = {
-    new LineageEdgeRDDImpl(partitionsRDD, this.targetStorageLevel)
+    new LineageEdgeRDDImpl(lineageContext, partitionsRDD, this.targetStorageLevel)
   }
 
   override private[graphx] def withTargetStorageLevel(
    targetStorageLevel: StorageLevel): LineageEdgeRDDImpl[ED, VD] = {
-    new LineageEdgeRDDImpl(this.partitionsRDD, targetStorageLevel)
+    new LineageEdgeRDDImpl(lineageContext, this.partitionsRDD, targetStorageLevel)
   }
 
+  override def innerJoin[ED2: ClassTag, ED3: ClassTag]
+  (other: LineageEdgeRDD[ED2])
+  (f: (VertexId, VertexId, ED, ED2) => ED3): LineageEdgeRDDImpl[ED3, VD] = {
+    val ed2Tag = classTag[ED2]
+    val ed3Tag = classTag[ED3]
+    this.withPartitionsRDD[ED3, VD](partitionsRDD.zipPartitions(other.partitionsRDD, true) {
+      (thisIter, otherIter) =>
+        val (pid, thisEPart) = thisIter.next()
+        val (_, otherEPart) = otherIter.next()
+        Iterator(Tuple2(pid, thisEPart.innerJoin(otherEPart)(f)(ed2Tag, ed3Tag)))
+    })
+  }
 }

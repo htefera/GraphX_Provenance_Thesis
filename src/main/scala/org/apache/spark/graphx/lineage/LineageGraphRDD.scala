@@ -16,12 +16,8 @@ import scala.reflect.ClassTag
  * @tparam ED
  */
 // Passing Record Id( It can server as Input, and output Id) as an argument to the LineageGraphRDD would be great
-abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected()
-  extends Graph[VD, ED] with LineageGraph[VD, ED] {
+abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected() extends LineageGraph[VD, ED] with Serializable {
 
-  override val vertices: LineageVertexRDDImpl[VD] //should return LineageVertexRDD
-  override val edges: LineageEdgeRDDImpl[ED, VD] //should return LineageEdgeRDD
-  override val triplets: RDD[EdgeTriplet[VD, ED]] //???
 
 /** Tracing backward and forward Lineage information for the Graph Abstractions*/
 
@@ -44,29 +40,30 @@ abstract class LineageGraphRDD[VD: ClassTag, ED: ClassTag] protected()
     ???
   }
 
-
 }
 
 
 object LineageGraphRDD {
 
   def apply[VD: ClassTag, ED: ClassTag](
-                                         vertices: RDD[(VertexId, VD)],
-                                         edges: RDD[Edge[ED]],
-                                         defaultVertexAttr: VD = null.asInstanceOf[VD],
-                                         edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
-                                         vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): LineageGraph[VD, ED] = {
-    LineageGraphRDDImpl(vertices, edges, defaultVertexAttr, edgeStorageLevel, vertexStorageLevel)
+     @transient lineageContext: LineageContext,
+     vertices: RDD[(VertexId, VD)],
+     edges: RDD[Edge[ED]],
+     defaultVertexAttr: VD = null.asInstanceOf[VD],
+     edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
+     vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): LineageGraph[VD, ED] = {
+    LineageGraphRDDImpl(lineageContext, vertices, edges, defaultVertexAttr, edgeStorageLevel, vertexStorageLevel)
   }
 
   def fromEdgeTuples[VD: ClassTag](
-                                    rawEdges: RDD[(VertexId, VertexId)],
-                                    defaultValue: VD,
-                                    uniqueEdges: Option[PartitionStrategy] = None,
-                                    edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
-                                    vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): LineageGraph[VD, Int] = {
+      @transient lineageContext: LineageContext,
+      rawEdges: RDD[(VertexId, VertexId)],
+      defaultValue: VD,
+      uniqueEdges: Option[PartitionStrategy] = None,
+      edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
+      vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): LineageGraph[VD, Int] = {
     val edges = rawEdges.map(p => Edge(p._1, p._2, 1))
-    val graph = LineageGraphRDDImpl(edges, defaultValue, edgeStorageLevel, vertexStorageLevel)
+    val graph = LineageGraphRDDImpl(lineageContext, edges, defaultValue, edgeStorageLevel, vertexStorageLevel)
     uniqueEdges match {
       case Some(p) => graph.partitionBy(p).groupEdges((a, b) => a + b)
       case None => graph

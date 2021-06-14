@@ -1,9 +1,9 @@
 package org.apache.spark.graphx.impl
 
+import org.apache.spark.graphx.lineage.{LineageEdgeRDD, LineageVertexRDD}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
-
 
 private[impl]
 class LineageReplicatedVertexView[VD: ClassTag, ED: ClassTag](
@@ -34,7 +34,7 @@ class LineageReplicatedVertexView[VD: ClassTag, ED: ClassTag](
    * `vertices`. This operation modifies the `ReplicatedVertexView`, and callers can access `edges`
    * afterwards to obtain the upgraded view.
    */
-  def upgrade(vertices: LineageVertexRDDImpl[VD], includeSrc: Boolean, includeDst: Boolean) {
+  def upgrade(vertices: LineageVertexRDD[VD], includeSrc: Boolean, includeDst: Boolean) {
     val shipSrc = includeSrc && !hasSrcId
     val shipDst = includeDst && !hasDstId
     if (shipSrc || shipDst) {
@@ -60,7 +60,7 @@ class LineageReplicatedVertexView[VD: ClassTag, ED: ClassTag](
    * vertex ids present in `actives`. This ships a vertex id to all edge partitions where it is
    * referenced, ignoring the attribute shipping level.
    */
-  def withActiveSet(actives: LineageVertexRDDImpl[VD]): LineageReplicatedVertexView[VD, ED] = {
+  def withActiveSet(actives: LineageVertexRDD[_]): LineageReplicatedVertexView[VD, ED] = {
     val shippedActives = actives.shipVertexIds()
       .setName("ReplicatedVertexView.withActiveSet - shippedActives (broadcast)")
       .partitionBy(edges.partitioner.get)
@@ -79,7 +79,7 @@ class LineageReplicatedVertexView[VD: ClassTag, ED: ClassTag](
    * `updates`. This ships a vertex attribute only to the edge partitions where it is in the
    * position(s) specified by the attribute shipping level.
    */
-  def updateVertices(updates: LineageVertexRDDImpl[VD]): LineageReplicatedVertexView[VD, ED] = {
+  def updateVertices(updates: LineageVertexRDD[VD]): LineageReplicatedVertexView[VD, ED] = {
     val shippedVerts = updates.shipVertexAttributes(hasSrcId, hasDstId)
       .setName("ReplicatedVertexView.updateVertices - shippedVerts %s %s (broadcast)".format(
         hasSrcId, hasDstId))

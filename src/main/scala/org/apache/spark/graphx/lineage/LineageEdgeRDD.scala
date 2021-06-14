@@ -14,8 +14,8 @@ import scala.reflect.ClassTag
  * Copy will have some dependency problem. You have to copy all dependecny
  */
 
-abstract class LineageEdgeRDD[ED](lc: LineageContext, deps: Seq[Dependency[_]]) extends EdgeRDD[ED](lc.sparkContext, deps)
-    with LineageEdge[ED] {
+abstract class LineageEdgeRDD[ED](lc: LineageContext, deps: Seq[Dependency[_]])
+  extends EdgeRDD[ED](lc.sparkContext, deps) with LineageEdge[ED] {
 
   private[graphx] def partitionsRDD: RDD[(PartitionID, EdgePartition[ED, VD])] forSome { type VD }
 
@@ -30,19 +30,19 @@ abstract class LineageEdgeRDD[ED](lc: LineageContext, deps: Seq[Dependency[_]]) 
 
   // TODO
 
-  def mapValues[ED2: ClassTag](f: Edge[ED] => ED2): EdgeRDD[ED2]
+  def mapValues[ED2: ClassTag](f: Edge[ED] => ED2): LineageEdgeRDD[ED2]
 
-  def reverse: EdgeRDD[ED]
+  def reverse: LineageEdgeRDD[ED]
 
-  def innerJoin[ED2: ClassTag, ED3: ClassTag] (other: EdgeRDD[ED2])
-    (f: (VertexId, VertexId, ED, ED2) => ED3): EdgeRDD[ED3]
+  def innerJoin[ED2: ClassTag, ED3: ClassTag] (other: LineageEdgeRDD[ED2])
+    (f: (VertexId, VertexId, ED, ED2) => ED3): LineageEdgeRDD[ED3]
 
-  private[graphx] def withTargetStorageLevel(targetStorageLevel: StorageLevel): EdgeRDD[ED]
+  private[graphx] def withTargetStorageLevel(targetStorageLevel: StorageLevel): LineageEdgeRDD[ED]
 }
 
 object LineageEdgeRDD{
 
-  def fromEdges[ED: ClassTag, VD: ClassTag](edges: RDD[Edge[ED]]): LineageEdgeRDDImpl[ED, VD] = {
+  def fromEdges[ED: ClassTag, VD: ClassTag](@transient lineageContext: LineageContext, edges: RDD[Edge[ED]]): LineageEdgeRDDImpl[ED, VD] = {
     val edgePartitions = edges.mapPartitionsWithIndex { (pid, iter) =>
       val builder = new EdgePartitionBuilder[ED, VD]
       iter.foreach { e =>
@@ -50,11 +50,12 @@ object LineageEdgeRDD{
       }
       Iterator((pid, builder.toEdgePartition))
     }
-    LineageEdgeRDD.fromEdgePartitions(edgePartitions)
+    LineageEdgeRDD.fromEdgePartitions(lineageContext, edgePartitions)
   }
 
   private[graphx] def fromEdgePartitions[ED: ClassTag, VD: ClassTag](
+      @transient lineageContext: LineageContext,
       edgePartitions: RDD[(Int, EdgePartition[ED, VD])]): LineageEdgeRDDImpl[ED, VD] = {
-    new LineageEdgeRDDImpl(edgePartitions)
+    new LineageEdgeRDDImpl(lineageContext, edgePartitions)
   }
 }

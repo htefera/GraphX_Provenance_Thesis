@@ -37,7 +37,7 @@ object TestSample {
     val verRDD = lc.parallelize(verArray)
     val edgeRDD = lc.parallelize(edgeArray)
 
-    val graph = LineageGraphRDD(verRDD, edgeRDD)
+    val graph = LineageGraphRDD(lc, verRDD, edgeRDD)
     //cluster running
 
 

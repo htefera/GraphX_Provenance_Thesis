@@ -14,23 +14,30 @@ import scala.reflect.ClassTag
 abstract class LineageVertexRDD[VD](lc: LineageContext, deps: Seq[Dependency[_]])
   extends VertexRDD[VD] (lc.sparkContext, deps) with LineageVertex[VD] {
 
-  override implicit protected def vdTag: ClassTag[VD] = ???
-
-  override private[graphx] def partitionsRDD = ???
-
-  override def lineageContext: LineageContext = lc
-
   override def compute(part: Partition, context: TaskContext): Iterator[(VertexId, VD)] = {
     firstParent[ShippableVertexPartition[VD]].iterator(part, context).next().iterator
   }
 
-  override def filter(pred: Tuple2[VertexId, VD] => Boolean): LineageVertexRDDImpl[VD] =
+  override def filter(pred: Tuple2[VertexId, VD] => Boolean): LineageVertexRDD[VD] =
     this.mapVertexPartitions(_.filter(Function.untupled(pred)))
+
+    override def withEdges(edges: EdgeRDD[_]): VertexRDD[VD] = {   // Todo Should be removed
+      val routingTables = LineageVertexRDD.createRoutingTables(edges, this.partitioner.get)
+      val vertexPartitions = partitionsRDD.zipPartitions(routingTables, true) {
+        (partIter, routingTableIter) =>
+          val routingTable =
+            if (routingTableIter.hasNext) routingTableIter.next() else RoutingTablePartition.empty
+          partIter.map(_.withRoutingTable(routingTable))
+    }
+    this.withPartitionsRDD(vertexPartitions)
+  }
+
+  def withEdges(edges: LineageEdgeRDD[_]): LineageVertexRDD[VD]
 }
 
 object LineageVertexRDD {
 
-  def apply[VD: ClassTag](vertices: RDD[(VertexId, VD)]): LineageVertexRDDImpl[VD] = {
+  def apply[VD: ClassTag](@transient lineageContext: LineageContext, vertices: RDD[(VertexId, VD)]): LineageVertexRDD[VD] = {
     val vPartitioned: RDD[(VertexId, VD)] = vertices.partitioner match {
       case Some(p) => vertices
       case None => vertices.partitionBy(new HashPartitioner(vertices.partitions.length))
@@ -38,15 +45,17 @@ object LineageVertexRDD {
     val vertexPartitions = vPartitioned.mapPartitions(
       iter => Iterator(ShippableVertexPartition(iter)),
       preservesPartitioning = true)
-    new LineageVertexRDDImpl(vertexPartitions) // TODO: tap
+    new LineageVertexRDDImpl(lineageContext, vertexPartitions) // TODO: tap
   }
 
   def apply[VD: ClassTag](
+    @transient lineageContext: LineageContext,
     vertices: RDD[(VertexId, VD)], edges: EdgeRDD[_], defaultVal: VD): LineageVertexRDDImpl[VD] = {
-    LineageVertexRDD(vertices, edges, defaultVal, (a, b) => a)  // TODO: tap
+    LineageVertexRDD(lineageContext, vertices, edges, defaultVal, (a, b) => a)  // TODO: tap
   }
 
   def apply[VD: ClassTag](
+       @transient lineageContext: LineageContext,
       vertices: RDD[(VertexId, VD)], edges: EdgeRDD[_], defaultVal: VD, mergeFunc: (VD, VD) => VD
     ): LineageVertexRDDImpl[VD] = {
     val vPartitioned: RDD[(VertexId, VD)] = vertices.partitioner match {
@@ -60,19 +69,19 @@ object LineageVertexRDD {
           if (routingTableIter.hasNext) routingTableIter.next() else RoutingTablePartition.empty
         Iterator(ShippableVertexPartition(vertexIter, routingTable, defaultVal, mergeFunc))
     }
-    new LineageVertexRDDImpl(vertexPartitions) // TODO: tap
+    new LineageVertexRDDImpl(lineageContext, vertexPartitions) // TODO: tap
   }
 
-
   def fromEdges[VD: ClassTag](
-     edges: EdgeRDD[_], numPartitions: Int, defaultVal: VD): LineageVertexRDDImpl[VD] = {
+     @transient lineageContext: LineageContext,
+      edges: LineageEdgeRDD[_], numPartitions: Int, defaultVal: VD): LineageVertexRDD[VD] = {
     val routingTables = createRoutingTables(edges, new HashPartitioner(numPartitions))
     val vertexPartitions = routingTables.mapPartitions({ routingTableIter =>
       val routingTable =
         if (routingTableIter.hasNext) routingTableIter.next() else RoutingTablePartition.empty
       Iterator(ShippableVertexPartition(Iterator.empty, routingTable, defaultVal))
     }, preservesPartitioning = true)
-    new LineageVertexRDDImpl(vertexPartitions)   // TODO: tap
+    new LineageVertexRDDImpl(lineageContext, vertexPartitions)   // TODO: tap
   }
 
   private[graphx] def createRoutingTables(
