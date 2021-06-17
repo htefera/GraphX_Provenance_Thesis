@@ -40,7 +40,6 @@ object TestSample {
     val graph = LineageGraphRDD(lc, verRDD, edgeRDD)
     //cluster running
 
-
     graph.vertices.filter {
       case (id, (city, population)) => population > 50000
     }.collect.foreach {
